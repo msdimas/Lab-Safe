@@ -1,29 +1,157 @@
-# LabSafe
+// Chage These Credentials with your Blynk Template credentials
+#define BLYNK_TEMPLATE_ID "TMPL61PGKOXdK"
+#define BLYNK_TEMPLATE_NAME "FinalProject"
+#define BLYNK_AUTH_TOKEN "PlJ5YLCJWmevODnXG8zuEUWzDt_jXKII"
 
-## Features💡
-- This tool can detect fires accurately
-- This tool can sound an alarm and water automatically
-- This tool can send automatic messages via WA Bot and Blynk
+#define BLYNK_PRINT Serial
 
-## Technology 👨‍💻
-LabSafe is created using:
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include "DHT.h"
+#include <HTTPClient.h>
 
-- [ESP32](https://camo.githubusercontent.com/85122bc4b9443e070fdce8b7b4c58783e8572e43f6cc5bc5c690846ad777d927/687474703a2f2f6769742e7768697465636174626f6172642e6f72672f646f697465737033322e6a7067) - ESP32 is used as a microcontroller.
-- [DHT22](https://id.szks-kuongshun.com/uploads/201810680/dht22-digital-temperature-humidity-sensor-module56055530906.jpg) - The DHT22 sensor is used to detect temperature and humidity.
-- [Flame Sensor](https://images.tokopedia.net/img/cache/700/product-1/2014/3/6/2827708/2827708_307f76f8-a506-11e3-ba30-2b9e4908a8c2.jpg) - Flame sensors are used to detect fire in the lab.
-- [MQ135](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTx_xKcqSuHsrcCysS6e4fxORBrHOjtVnnFw&s) - The MQ135 sensor is used to detect if there is smoke in the lab room.
-- [Mini Pump](https://jogjarobotika.com/3315/2240-3315.jpg) - Mini pumps are used for automatic watering.
-- [Buzzer](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR8SYe5Y5gVDnWSfa9Q5J4f9VQ9ZtyJLfaPJ_GZW5dHoQ&s) - Buzzer is used for alarm.
+char auth[] = BLYNK_AUTH_TOKEN;
+char ssid[] = "Realmi 8i";  // Change your Wifi/ Hotspot Name
+char pass[] = "DimasFirman";    // Change your Wifi/ Hotspot Password
+
+BlynkTimer timer;
+
+#define fire 13
+#define buzzer 4
+#define MQ135_PIN 34
+#define DHTPIN 15
+#define DHTTYPE DHT22
+#define RELAY_PIN 5
+
+DHT dht(DHTPIN, DHTTYPE);
+
+String url;
+WiFiClient client;
+
+int fire_Val = 0;
+float h = 0;
+float t = 0;
+int mq135Value = 0;
+
+void setup()  //Setup function - only function that is run in deep sleep mode
+{
+  Serial.begin(115200);  //Start the serial output at 9600 baud
+  pinMode(fire, INPUT);
+  pinMode(buzzer, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  dht.begin();
+  Blynk.begin(auth, ssid, pass);  //Splash screen delay
+}
+
+void loop()  //Loop function
+{
+  Blynk.run();
+  mySensor();
+  delay(200);
+}
+
+void mySensor() {
+  fire_Val = digitalRead(fire);
+
+  if (fire_Val == LOW) {
+    Blynk.virtualWrite(V2, 1);
+    Serial.print("fIRE Level: ");
+    Serial.println(fire_Val);
+  }
+
+  else {
+    Blynk.virtualWrite(V2, 0);
+    Serial.print("fIRE Level: ");
+    Serial.println(fire_Val);
+  }
+  mq135Value = analogRead(MQ135_PIN);
+  Blynk.virtualWrite(V3, mq135Value);
+  Serial.println("MQ 135: ");
+  Serial.println(mq135Value);
+
+  h = dht.readHumidity();
+  t = dht.readTemperature();  // or dht.readTemperature(true) for Fahrenheit
+  Serial.println("");
+  Serial.print(F("Humidity Room: "));
+  Serial.print(h);
+  Serial.println(F("% "));
+  Serial.print(F("Temperature Room: "));
+  Serial.print(t);
+  Serial.println(F("°C  "));
+
+  Blynk.virtualWrite(V0, t);
+  Blynk.virtualWrite(V1, h);
+  delay(1000);
+
+  if (fire_Val == LOW) {
+    // If any condition is met, activate the buzzer and relay
+    Blynk.logEvent("fire_event");
+    kirimwa("Bahaya!!! Telah ditemukan api di tempat anda.\nSegera Evakuasi dari tempat tersebut.");
+    digitalWrite(buzzer, HIGH);
+    digitalWrite(RELAY_PIN, HIGH);
+    Serial.println("Fire detected! Activating buzzer and relay.");
+
+  } else if (mq135Value >= 1000) {
+    kirimwa("Bahaya!!! Telah ditemukan gas di tempat anda. \n Nilai Gas : " + String(mq135Value) + "\n     Segera Evakuasi dari tempat tersebut.");
+    digitalWrite(buzzer, HIGH);
+  } else if (t >= 37) {
+    kirimwa("Peringatan!!! Suhu di tempat anda mencapai " + String(t) + " °C. Segera Ambil Tindakan.");
+  } else {
+    digitalWrite(buzzer, LOW);
+    digitalWrite(RELAY_PIN, LOW);
+    Serial.println("No fire detected.");
+  }
+}
+
+void kirimwa(String pesan) {
+
+  url = "http://api.callmebot.com/whatsapp.php?phone=6282334641928&text=" + urlencode(pesan) + "&apikey=5487003";
+  postData();
+}
+
+void postData() {
+  int httpCode;
+  HTTPClient http;
+  http.begin(client, url);
+  httpCode = http.POST(url);
+  if (httpCode == 200) {
+    Serial.println("Notifikasi WhatsApp Berhasil Terkirim");
+  } else {
+    Serial.println("Notifikasi WhatsApp Gagal Terkirim");
+  }
+  http.end();
+}
 
 
-## Contributors ✨
-<br>
-<table align="center">
-  <tr>
-    <td align="center"><a href="https://github.com/bshriyuni"><img src="https://avatars.githubusercontent.com/u/114081554?v=4" width="150px;" alt=""/><br><sub><b>B16 - Besse Sahriyuni - Universitas Hasanuddin </b></sub></td> 
-    <td align="center"><a href="https://github.com/teguhkurniawan18"><img src="https://avatars.githubusercontent.com/u/167568046?v=4" width="150px;" alt=""/><br><sub><b>B17 - Teguh Kurniawan - Universitas Singaperbangsa Karawang</b></sub></td>
-    <td align="center"><a href="https://github.com/Loventina"><img src="https://avatars.githubusercontent.com/u/167601194?v=4" width="150px;" alt=""/><br><sub><b>B18 - Loventina Joshepine Prasetyo - Universitas Singaperbangsa Karawang</b></sub></td>
-    <td align="center"><a href="https://github.com/MiftahulHuda01"><img src="https://avatars.githubusercontent.com/u/134380249?v=4" width="150px;" alt=""/><br><sub><b>B19 - Miftahul Huda - Universitas Negeri Makassar </b></sub></td>
-    <td align="center"><a href="https://github.com/msdimas"><img src="https://avatars.githubusercontent.com/u/100691400?v=4" width="150px;" alt=""/><br><sub><b>B20 - Dimas Firmansyah - Universitas Udayana </b></sub></td>
-  </tr>
-</table>
+String urlencode(String str) {
+
+  String encodedString = "";
+  char c;
+  char code0, code1, code2;
+  for (int i = 0; i < str.length(); i++) {
+    c = str.charAt(i);
+    if (c == ' ') {
+      encodedString += '+';
+    } else if (isalnum(c)) {
+      encodedString += c;
+    } else {
+      code1 = (c & 0xf) + '0';
+      if ((c & 0xf) > 9) {
+        code1 = (c & 0xf) - 10 + 'A';
+      }
+      c = (c >> 4) & 0xf;
+      code0 = c + '0';
+      if (c > 9) {
+        code0 = c - 10 + 'A';
+      }
+      code2 = '\0';
+      encodedString += '%';
+      encodedString += code0;
+      encodedString += code1;
+    }
+    yield();
+  }
+  Serial.println(encodedString);
+  return encodedString;
+}
